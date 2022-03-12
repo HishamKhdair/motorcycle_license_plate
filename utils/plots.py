@@ -108,8 +108,11 @@ def output_to_target(output):
     # Convert model output to target format [batch_id, class_id, x, y, w, h, conf]
     targets = []
     for i, o in enumerate(output):
-        for *box, conf, cls in o.cpu().numpy():
-            targets.append([i, cls, *list(*xyxy2xywh(np.array(box)[None])), conf])
+        targets.extend(
+            [i, cls, *list(*xyxy2xywh(np.array(box)[None])), conf]
+            for *box, conf, cls in o.cpu().numpy()
+        )
+
     return np.array(targets)
 
 
@@ -171,7 +174,7 @@ def plot_images(images, targets, paths=None, fname='images.jpg', names=None, max
                 color = colors[cls % len(colors)]
                 cls = names[cls] if names else cls
                 if labels or conf[j] > 0.25:  # 0.25 conf thresh
-                    label = '%s' % cls if labels else '%s %.1f' % (cls, conf[j])
+                    label = f'{cls}' if labels else '%s %.1f' % (cls, conf[j])
                     plot_one_box(box, mosaic, label=label, color=color, line_thickness=tl)
 
         # Draw image filename labels
@@ -245,11 +248,11 @@ def plot_study_txt(path='', x=None):  # from utils.plots import *; plot_study_tx
     # ax = ax.ravel()
 
     fig2, ax2 = plt.subplots(1, 1, figsize=(8, 4), tight_layout=True)
+    s = ['P', 'R', 'mAP@.5', 'mAP@.5:.95', 't_inference (ms/img)', 't_NMS (ms/img)', 't_total (ms/img)']
     # for f in [Path(path) / f'study_coco_{x}.txt' for x in ['yolov5s6', 'yolov5m6', 'yolov5l6', 'yolov5x6']]:
     for f in sorted(Path(path).glob('study*.txt')):
         y = np.loadtxt(f, dtype=np.float32, usecols=[0, 1, 2, 3, 7, 8, 9], ndmin=2).T
         x = np.arange(y.shape[1]) if x is None else np.array(x)
-        s = ['P', 'R', 'mAP@.5', 'mAP@.5:.95', 't_inference (ms/img)', 't_NMS (ms/img)', 't_total (ms/img)']
         # for i in range(7):
         #     ax[i].plot(x, y[i], '.-', linewidth=2, markersize=8)
         #     ax[i].set_title(s[i])
@@ -268,7 +271,7 @@ def plot_study_txt(path='', x=None):  # from utils.plots import *; plot_study_tx
     ax2.set_xlabel('GPU Speed (ms/img)')
     ax2.set_ylabel('COCO AP val')
     ax2.legend(loc='lower right')
-    plt.savefig(str(Path(path).name) + '.png', dpi=300)
+    plt.savefig(f'{str(Path(path).name)}.png', dpi=300)
 
 
 def plot_labels(labels, names=(), save_dir=Path(''), loggers=None):
@@ -370,7 +373,7 @@ def profile_idetection(start=0, stop=0, labels=(), save_dir=''):
                 else:
                     a.remove()
         except Exception as e:
-            print('Warning: Plotting error for %s; %s' % (f, e))
+            print(f'Warning: Plotting error for {f}; {e}')
 
     ax[1].legend()
     plt.savefig(Path(save_dir) / 'idetection_profile.png', dpi=200)
@@ -412,7 +415,10 @@ def plot_results(start=0, stop=0, bucket='', id=(), labels=(), save_dir=''):
         os.system(c)
     else:
         files = list(Path(save_dir).glob('results*.txt'))
-    assert len(files), 'No results.txt files found in %s, nothing to plot.' % os.path.abspath(save_dir)
+    assert len(
+        files
+    ), f'No results.txt files found in {os.path.abspath(save_dir)}, nothing to plot.'
+
     for fi, f in enumerate(files):
         try:
             results = np.loadtxt(f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2).T
@@ -429,7 +435,7 @@ def plot_results(start=0, stop=0, bucket='', id=(), labels=(), save_dir=''):
                 # if i in [5, 6, 7]:  # share train and val loss y axes
                 #     ax[i].get_shared_y_axes().join(ax[i], ax[i - 5])
         except Exception as e:
-            print('Warning: Plotting error for %s; %s' % (f, e))
+            print(f'Warning: Plotting error for {f}; {e}')
 
     ax[1].legend()
     fig.savefig(Path(save_dir) / 'results.png', dpi=200)
