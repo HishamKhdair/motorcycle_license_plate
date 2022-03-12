@@ -128,7 +128,7 @@ def profile(x, ops, n=100, device=None):
 
         s_in = tuple(x.shape) if isinstance(x, torch.Tensor) else 'list'
         s_out = tuple(y.shape) if isinstance(y, torch.Tensor) else 'list'
-        p = sum(list(x.numel() for x in m.parameters())) if isinstance(m, nn.Module) else 0  # parameters
+        p = sum(x.numel() for x in m.parameters()) if isinstance(m, nn.Module) else 0
         print(f'{p:12}{flops:12.4g}{dtf:16.4g}{dtb:16.4g}{str(s_in):>24s}{str(s_out):>24s}')
 
 
@@ -138,7 +138,13 @@ def is_parallel(model):
 
 def intersect_dicts(da, db, exclude=()):
     # Dictionary intersection of matching keys and shapes, omitting 'exclude' keys, using da values
-    return {k: v for k, v in da.items() if k in db and not any(x in k for x in exclude) and v.shape == db[k].shape}
+    return {
+        k: v
+        for k, v in da.items()
+        if k in db
+        and all(x not in k for x in exclude)
+        and v.shape == db[k].shape
+    }
 
 
 def initialize_weights(model):
@@ -245,16 +251,14 @@ def load_classifier(name='resnet101', n=2):
 
 
 def scale_img(img, ratio=1.0, same_shape=False, gs=32):  # img(16,3,256,416)
-    # scales img(bs,3,y,x) by ratio constrained to gs-multiple
     if ratio == 1.0:
         return img
-    else:
-        h, w = img.shape[2:]
-        s = (int(h * ratio), int(w * ratio))  # new size
-        img = F.interpolate(img, size=s, mode='bilinear', align_corners=False)  # resize
-        if not same_shape:  # pad/crop img
-            h, w = [math.ceil(x * ratio / gs) * gs for x in (h, w)]
-        return F.pad(img, [0, w - s[1], 0, h - s[0]], value=0.447)  # value = imagenet mean
+    h, w = img.shape[2:]
+    s = (int(h * ratio), int(w * ratio))  # new size
+    img = F.interpolate(img, size=s, mode='bilinear', align_corners=False)  # resize
+    if not same_shape:  # pad/crop img
+        h, w = [math.ceil(x * ratio / gs) * gs for x in (h, w)]
+    return F.pad(img, [0, w - s[1], 0, h - s[0]], value=0.447)  # value = imagenet mean
 
 
 def copy_attr(a, b, include=(), exclude=()):

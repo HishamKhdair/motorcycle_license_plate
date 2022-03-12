@@ -150,14 +150,12 @@ def check_imshow():
 
 
 def check_file(file):
-    # Search for file if not found
     if Path(file).is_file() or file == '':
         return file
-    else:
-        files = glob.glob('./**/' + file, recursive=True)  # find file
-        assert len(files), f'File Not Found: {file}'  # assert file was found
-        assert len(files) == 1, f"Multiple files match '{file}', specify exact path: {files}"  # assert unique
-        return files[0]  # return file
+    files = glob.glob('./**/' + file, recursive=True)  # find file
+    assert len(files), f'File Not Found: {file}'  # assert file was found
+    assert len(files) == 1, f"Multiple files match '{file}', specify exact path: {files}"  # assert unique
+    return files[0]  # return file
 
 
 def check_dataset(dict):
@@ -167,20 +165,19 @@ def check_dataset(dict):
         val = [Path(x).resolve() for x in (val if isinstance(val, list) else [val])]  # val path
         if not all(x.exists() for x in val):
             print('\nWARNING: Dataset not found, nonexistent paths: %s' % [str(x) for x in val if not x.exists()])
-            if s and len(s):  # download script
-                if s.startswith('http') and s.endswith('.zip'):  # URL
-                    f = Path(s).name  # filename
-                    print(f'Downloading {s} ...')
-                    torch.hub.download_url_to_file(s, f)
-                    r = os.system(f'unzip -q {f} -d ../ && rm {f}')  # unzip
-                elif s.startswith('bash '):  # bash script
-                    print(f'Running {s} ...')
-                    r = os.system(s)
-                else:  # python script
-                    r = exec(s)  # return None
-                print('Dataset autodownload %s\n' % ('success' if r in (0, None) else 'failure'))  # print result
-            else:
+            if not s or not len(s):
                 raise Exception('Dataset not found.')
+            if s.startswith('http') and s.endswith('.zip'):  # URL
+                f = Path(s).name  # filename
+                print(f'Downloading {s} ...')
+                torch.hub.download_url_to_file(s, f)
+                r = os.system(f'unzip -q {f} -d ../ && rm {f}')  # unzip
+            elif s.startswith('bash '):  # bash script
+                print(f'Running {s} ...')
+                r = os.system(s)
+            else:  # python script
+                r = exec(s)  # return None
+            print('Dataset autodownload %s\n' % ('success' if r in (0, None) else 'failure'))  # print result
 
 
 def download(url, dir='.', multi_thread=False):
@@ -269,21 +266,93 @@ def labels_to_class_weights(labels, nc=80):
 def labels_to_image_weights(labels, nc=80, class_weights=np.ones(80)):
     # Produces image weights based on class_weights and image contents
     class_counts = np.array([np.bincount(x[:, 0].astype(np.int), minlength=nc) for x in labels])
-    image_weights = (class_weights.reshape(1, nc) * class_counts).sum(1)
     # index = random.choices(range(n), weights=image_weights, k=1)  # weight image sample
-    return image_weights
+    return (class_weights.reshape(1, nc) * class_counts).sum(1)
 
 
 def coco80_to_coco91_class():  # converts 80-index (val2014) to 91-index (paper)
-    # https://tech.amikelive.com/node-718/what-object-categories-labels-are-in-coco-dataset/
-    # a = np.loadtxt('data/coco.names', dtype='str', delimiter='\n')
-    # b = np.loadtxt('data/coco_paper.names', dtype='str', delimiter='\n')
-    # x1 = [list(a[i] == b).index(True) + 1 for i in range(80)]  # darknet to coco
-    # x2 = [list(b[i] == a).index(True) if any(b[i] == a) else None for i in range(91)]  # coco to darknet
-    x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33, 34,
-         35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
-         64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90]
-    return x
+    return [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        27,
+        28,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        67,
+        70,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+    ]
 
 
 def xyxy2xywh(x):
@@ -398,25 +467,23 @@ def bbox_iou(box1, box2, x1y1x2y2=True, GIoU=False, DIoU=False, CIoU=False, eps=
     union = w1 * h1 + w2 * h2 - inter + eps
 
     iou = inter / union
-    if GIoU or DIoU or CIoU:
-        cw = torch.max(b1_x2, b2_x2) - torch.min(b1_x1, b2_x1)  # convex (smallest enclosing box) width
-        ch = torch.max(b1_y2, b2_y2) - torch.min(b1_y1, b2_y1)  # convex height
-        if CIoU or DIoU:  # Distance or Complete IoU https://arxiv.org/abs/1911.08287v1
-            c2 = cw ** 2 + ch ** 2 + eps  # convex diagonal squared
-            rho2 = ((b2_x1 + b2_x2 - b1_x1 - b1_x2) ** 2 +
-                    (b2_y1 + b2_y2 - b1_y1 - b1_y2) ** 2) / 4  # center distance squared
-            if DIoU:
-                return iou - rho2 / c2  # DIoU
-            elif CIoU:  # https://github.com/Zzh-tju/DIoU-SSD-pytorch/blob/master/utils/box/box_utils.py#L47
-                v = (4 / math.pi ** 2) * torch.pow(torch.atan(w2 / h2) - torch.atan(w1 / h1), 2)
-                with torch.no_grad():
-                    alpha = v / (v - iou + (1 + eps))
-                return iou - (rho2 / c2 + v * alpha)  # CIoU
-        else:  # GIoU https://arxiv.org/pdf/1902.09630.pdf
-            c_area = cw * ch + eps  # convex area
-            return iou - (c_area - union) / c_area  # GIoU
-    else:
+    if not GIoU and not DIoU and not CIoU:
         return iou  # IoU
+    cw = torch.max(b1_x2, b2_x2) - torch.min(b1_x1, b2_x1)  # convex (smallest enclosing box) width
+    ch = torch.max(b1_y2, b2_y2) - torch.min(b1_y1, b2_y1)  # convex height
+    if CIoU or DIoU:  # Distance or Complete IoU https://arxiv.org/abs/1911.08287v1
+        c2 = cw ** 2 + ch ** 2 + eps  # convex diagonal squared
+        rho2 = ((b2_x1 + b2_x2 - b1_x1 - b1_x2) ** 2 +
+                (b2_y1 + b2_y2 - b1_y1 - b1_y2) ** 2) / 4  # center distance squared
+        if DIoU:
+            return iou - rho2 / c2  # DIoU
+        v = (4 / math.pi ** 2) * torch.pow(torch.atan(w2 / h2) - torch.atan(w1 / h1), 2)
+        with torch.no_grad():
+            alpha = v / (v - iou + (1 + eps))
+        return iou - (rho2 / c2 + v * alpha)  # CIoU
+    else:  # GIoU https://arxiv.org/pdf/1902.09630.pdf
+        c_area = cw * ch + eps  # convex area
+        return iou - (c_area - union) / c_area  # GIoU
 
 
 def box_iou(box1, box2):
@@ -556,7 +623,9 @@ def strip_optimizer(f='best.pt', s=''):  # from utils.general import *; strip_op
         p.requires_grad = False
     torch.save(x, s or f)
     mb = os.path.getsize(s or f) / 1E6  # filesize
-    print(f"Optimizer stripped from {f},{(' saved as %s,' % s) if s else ''} {mb:.1f}MB")
+    print(
+        f"Optimizer stripped from {f},{f' saved as {s},' if s else ''} {mb:.1f}MB"
+    )
 
 
 def print_mutation(hyp, results, yaml_file='hyp_evolved.yaml', bucket=''):
@@ -567,9 +636,9 @@ def print_mutation(hyp, results, yaml_file='hyp_evolved.yaml', bucket=''):
     print('\n%s\n%s\nEvolved fitness: %s\n' % (a, b, c))
 
     if bucket:
-        url = 'gs://%s/evolve.txt' % bucket
+        url = f'gs://{bucket}/evolve.txt'
         if gsutil_getsize(url) > (os.path.getsize('evolve.txt') if os.path.exists('evolve.txt') else 0):
-            os.system('gsutil cp %s .' % url)  # download evolve.txt if larger than local
+            os.system(f'gsutil cp {url} .')
 
     with open('evolve.txt', 'a') as f:  # append result
         f.write(c + b + '\n')
@@ -587,7 +656,7 @@ def print_mutation(hyp, results, yaml_file='hyp_evolved.yaml', bucket=''):
         yaml.safe_dump(hyp, f, sort_keys=False)
 
     if bucket:
-        os.system('gsutil cp evolve.txt %s gs://%s' % (yaml_file, bucket))  # upload
+        os.system(f'gsutil cp evolve.txt {yaml_file} gs://{bucket}')
 
 
 def apply_classifier(x, model, img, im0):
@@ -609,7 +678,7 @@ def apply_classifier(x, model, img, im0):
             # Classes
             pred_cls1 = d[:, 5].long()
             ims = []
-            for j, a in enumerate(d):  # per item
+            for a in d:
                 cutout = im0[i][int(a[1]):int(a[3]), int(a[0]):int(a[2])]
                 im = cv2.resize(cutout, (224, 224))  # BGR
                 # cv2.imwrite('test%i.jpg' % j, cutout)

@@ -71,7 +71,7 @@ def img_classify(frame):
 def object_detection(frame):
 	img = torch.from_numpy(frame)
 	img = img.permute(2, 0, 1).float().to(device)
-	img /= 255.0  
+	img /= 255.0
 	if img.ndimension() == 3:
 		img = img.unsqueeze(0)
 
@@ -79,7 +79,7 @@ def object_detection(frame):
 	pred = non_max_suppression(pred, conf_set, 0.30) # prediction, conf, iou
 
 	detection_result = []
-	for i, det in enumerate(pred):
+	for det in pred:
 		if len(det): 
 			for d in det: # d = (x1, y1, x2, y2, conf, cls)
 				x1 = int(d[0].item())
@@ -88,12 +88,12 @@ def object_detection(frame):
 				y2 = int(d[3].item())
 				conf = round(d[4].item(), 2)
 				c = int(d[5].item())
-				
+
 				detected_name = names[c]
 
 				print(f'Detected: {detected_name} conf: {conf}  bbox: x1:{x1}    y1:{y1}    x2:{x2}    y2:{y2}')
 				detection_result.append([x1, y1, x2, y2, conf, c])
-				
+
 				frame = cv2.rectangle(frame, (x1, y1), (x2, y2), (255,0,0), 1) # box
 				if c!=1: # if it is not head bbox, then write use putText
 					frame = cv2.putText(frame, f'{names[c]} {str(conf)}', (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 1, cv2.LINE_AA)
